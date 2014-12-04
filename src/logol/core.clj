@@ -4,26 +4,81 @@
 ;;; The goal of this library being to find patterns like these in literature
 ;;; and other instances of text (especially records of unscripted spoken dialogue) 
 
+(def ALPHABET (into [] (seq "abcdefghijklmnopqrstuvwxyz")))
+
+(defn alphabetic-value [letter]
+  (inc (.indexOf ALPHABET letter)))
+
+(defn letter [n]
+  "returns the letter whose index is n, which must be between 1 and 26"
+  (ALPHABET (dec n)))
+
+;;; let this take a negative n
+(defn circular-alphabet [n]
+  "Takes an int n and returns the letter at that index, but it wraps around so 27 would be A again."
+  (if (<= n 26)
+    (letter n)
+    (let [wrapped (- n (* 26 (if (= 0 (mod n 26))
+                               (dec (quot n 26))
+                               (quot n 26))))]
+      (letter wrapped))))
+
+;;; n must be between -26 and 26
+(defn shift-letter [letter n]
+  "Takes a letter and returns a new letter that is n spaces to its left or right in the circular alphabet."
+  (if (> n 0)
+    (circular-alphabet (+ (alphabetic-value letter) n))
+    (circular-alphabet (+ (alphabetic-value letter) (+ 26 n)))))
+
+(defn lettershift [word n]
+  "Takes a word and shifts each letter n spaces."
+  (apply str (map shift-letter word (repeat (count word) n))))
 
 (defn strings->regex [strings]
   (re-pattern (s/join  (interpose "|" strings))))
 
-;;; change these next 2 so that they return true or the disqualifying letters
-;;; this will let me know how far they are from succeeding.
+;;; on these its important to normalize the string to lowercase. 
+
+;;; modify these to return a frequencies map and not just the letters
 
 ;;; if its false return which letters were found? return empty if none were?
 (defn lipogram? [string omitions]
-  "Returns true if the string contains none of the characters in omitions"
-  (empty? (re-find (strings->regex omitions) string)))
+  "Returns true if the string contains none of the characters in omitions, and if it does, returns which ones."
+  (let [found (re-seq (strings->regex (map str omitions)) string)]
+                                        ;re-seq so we get all the ones it finds.
+    (if found
+      found
+      true)))
+;;; might be more useful to return a map of where the word was found?
+;;; that might be best for another function, or a seperate check for the
+;;; use case.
 
-;;; returns true if the word contains all letters and if not returns which
-;;; its missing. An odd way to handle booleans since it'll always be true
-;;; use to see words containing all five vowels.
-(defn word-contains? [string letters]
-  "Returns true if word contains them all and false if not"
-  (empty?
-   (filter nil? (map re-find (map re-pattern letters)
-                     (repeat (count letters) string)))))
+(defn char->pattern [char]
+  (re-pattern (str char)))
+
+(defn pattern->char [pat]
+  (first (seq (str pat))))
+
+(defn re-missing [pattern string]
+  "Inversion of re-find, where if it isnt found, returns the missing pattern"
+  (if-not (re-find pattern string)
+    pattern
+    nil))
+
+;;; its important that they be individual letters, or maybe characters,
+;;; not a full string. maybe use & instead of a vector?
+;;; combine all the letters into a regex that uses and instead of or
+(defn antilipo? [string letters]
+  "Returns true if word contains them all and if not which letters werent found everywhere."
+  (let [missing (map re-missing (map char->pattern letters)
+                     (repeat (count letters) string))]
+    (if (every? nil? missing)
+      true
+      (remove nil? (map pattern->char missing))))) 
+
+(defn pangram? [string]
+  "Retruns true if the string contains at least one instance of every letter in the alphabet."
+  (antilipo? string ALPHABET))
 
 (defn words [string]
   (s/split (s/lower-case string) #" "))
@@ -81,6 +136,31 @@
 
 
 
+;;; acrostic lines will just take a seq of text and check every beginning
 
+
+;;; tautonyms, should tell you how many parts it is. 
+
+;;; charade sentences, same as scriptio continua. disregards punct, spacing
+
+;;; word graphs: use Loom
+
+(defn str-reverse [string]
+  (apply str (reverse string)))
+
+;;; palindromes: words, sentences, and acronyms
+(defn palindrome? [word]
+  (= word (str-reverse)))
+
+;;; modify this to look in the dictionary and in wordnet?
+(defn word? [word]
+  "Returns true if the word is found in UNIX words"
+  )
+
+
+(defn reversal? [word]
+  "A reversal is a word that is another word (that is not itself) spelled backwards."
+  (and (word? (str-reverse word))
+       (not (palindrom? word))))
 
 
