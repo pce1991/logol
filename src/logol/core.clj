@@ -4,7 +4,10 @@
 ;;; The goal of this library being to find patterns like these in literature
 ;;; and other instances of text (especially records of unscripted spoken dialogue) 
 
-(def ALPHABET (into [] (seq "abcdefghijklmnopqrstuvwxyz")))
+(defn letters [str]
+  (into [] (seq str)))
+
+(def ALPHABET (letters "abcdefghijklmnopqrstuvwxyz"))
 
 (defn alphabetic-value [letter]
   (inc (.indexOf ALPHABET letter)))
@@ -17,6 +20,24 @@
 (defn circular-alphabet [n]
   "Takes an int n and returns the letter at that index, but it wraps around so 27 would be A again."
   (letter (mod n 26)))
+
+(defn read-seq
+  "Opens a files and line-seqs on the rdr"
+  [filename]
+  (with-open [rdr (clojure.java.io/reader filename)]
+    (into [] (line-seq rdr))))
+
+(def CORPUS (into [] (read-seq "resources/words")))
+(def MAX-LENGTH (apply max (map count CORPUS)))
+
+;;; modify this to look in the dictionary and in wordnet?
+;;; is a word only an english one? More interesting to see what english words
+;;; can become a word from another language when shifted, reversed, etcetera
+(defn word? [word]
+  "Returns true if the word is found in UNIX words"
+  (if (some #{word} CORPUS)
+    true
+    false))
 
 (defn words [string]
   (s/split (s/lower-case string) #" "))
@@ -52,6 +73,8 @@
 (defn lettershift [word n]
   "Takes a word and shifts each letter n spaces."
   (apply str (map shift-letter word (repeat (count word) n))))
+
+;;; valide-lettershift? which checks to see if the word made exists
 
 (defn strings->regex [strings]
   (re-pattern (s/join  (interpose "|" strings))))
@@ -113,17 +136,21 @@
   "Returns true if the word contains no letter more than once."
   (empty? (filter #(> % 1) (vals (frequencies string)))))
 
-;;; will look at all possible substrings and check each, returning the
-;;; longest one.
+(defn isogram-sentence? [sentence]
+  (empty? (filter #(> % 1) (vals (frequencies (words sentence))))))
+
 (defn pangram-window? [string]
   "Returns true if the string contains atleast one instance of every letter."
   (and (= (count (keys (frequencies string))) 26)
        (isogram-sentence? string)))
 
+;;; will look at all possible substrings and check each, returning the
+;;; longest one.
+(defn contains-pangram? [string])
+
 ;;; an isogram sentence is one where a word is only ever used once.
 ;;; what about different forms of the word?
-(defn isogram-sentence? [sentence]
-  (empty? (filter #(> % 1) (vals (frequencies (words sentence))))))
+
 
 ;;; one where each of its letters appear n times
 ;;; n-isogram? 
@@ -136,6 +163,8 @@
 (defn generate-scheme [string]
   "Generates a scheme from a string, ignoring whitespace."
   (map s/lower-case (remove #(= % " ") (s/split string #""))))
+
+;;; maybe scheme should be a regex?
 
 ;;; scheme may just be a seq of letters which must pair up with the string
 ;;; what if they arent the same length? throw an error, or wrap around
@@ -155,15 +184,23 @@
           ;; scheme may excede or fall short of letter-count, allow overflow?
           (> (count scheme) (count letters))
           false ;maybe allow overflow acrostic, so it fits most of the pattern but not all.
-          ;; how to handle first letter of each line spelling out something?
-          ;; just give it the first letter of each line.
-          ;; what about each word beginning with the end of the last word
-          ;; to the nth place. 
           )))
+;;; how to handle first letter of each line spelling out something?
+;;; just give it the first letter of each line.
+;;; what about each word beginning with the end of the last word
+;;; to the nth place. 
 ;;; acrostic lines will just take a seq of text and check every beginning
 
+;;; this runs into the same problems as acrostic and is redundant
+(defn telestic? [string scheme]
+  "Checks the last letters to see if it fits the scheme.")
 
-;;; tautonyms, should tell you how many parts it is. 
+;;; tautonyms, should tell you how many parts it is.
+;;; what about pivoting on a letter if its odd?
+(defn tautonym? [word]
+  "Returns false if not a tautonym, and if it is then how long."
+    
+  )
 
 ;;; charade sentences, same as scriptio continua. disregards punct, spacing
 
@@ -176,12 +213,9 @@
 (defn palindrome? [word]
   (= word (str-reverse)))
 
-;;; modify this to look in the dictionary and in wordnet?
-;;; is a word only an english one? More interesting to see what english words
-;;; can become a word from another language when shifted, reversed, etcetera
-(defn word? [word]
-  "Returns true if the word is found in UNIX words"
-  )
+(defn palindorme-phrase? [string]
+  "Ignoring whitespace, returns true if the seq of characters is a palindrome."
+  (palindrome? (replace string #" " "")))
 
 (defn reversal? [word]
   "A reversal is a word that is another word (that is not itself) spelled backwards."
@@ -191,3 +225,45 @@
 ;;; ladders: given a word will return three + n words which are made from
 ;;; subsequent one letter changes to the words (allow adding a character?)
 ;;; might not be a ladder anymore.
+
+;;; generate all possible anagrams for a word, making sure each is valid.
+;;; anagrams
+
+;;; consectutive identitcal letters
+
+;;; cadence: two identical letters seperated by the same number of letters
+;;; find the longest instance of one.
+
+;;; anchor???
+(defn anchor [word]
+  "Turns a word into its anchorized form: a pair of beginning and ending letter."
+  [(first word) (last word)])
+
+;;; tautonyms and palindromes embedded in words. 
+
+;;;check for rhymes in 
+
+;;takes an acronym and creates all permutations of those letters.
+(defn permutations [acronym]
+  )
+
+(defn vowelize [consonants]
+  "takes a string of consonants which it turns into a regex and looks up all matches in corpus."
+  (let [consoseq (map str (seq consonants))
+        regex (re-pattern
+               (apply str (interleave (repeat (count consoseq)
+                                              "([AOEUIYaoeuiy]*)?") consoseq)))]
+    (if (< (count consonants) MAX-LENGTH)
+      (remove nil? (for [word CORPUS]
+                     (if (re-matches regex word)
+                       word
+                       nil))))))
+
+;;may not quite be right, and should preserve more order, so each partition should be all the ways you might divide it up, but you know: if you let the first letter stand alone then you can choose these, and if you had the next two grouped together these are your options; but another partition shows you what it's like if you group the first two together instead, then you cant group the second two.
+(defn consonants->sentences [consonants-string]
+  (let [all-partitions (for [i (range (count consonants-string))]
+                         (partition i 1 consonants-string))
+        vowels (remove empty? (for [partition all-partitions
+                                    word partition]
+                                (vowelize (apply str word))))]
+    vowels))
